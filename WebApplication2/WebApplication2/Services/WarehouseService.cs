@@ -11,17 +11,19 @@ public interface IWarehouseService
 
 public class WarehouseService : IWarehouseService
 {
-    private readonly IWarehouseRepository _warehouseRepository;
-    private readonly IProductRepository _productRepository;
     private readonly IOrderRepository _orderRepository;
+    private readonly IProductRepository _productRepository;
+    private readonly IProduct_WarehouseRespository _productWarehouseRespository;
+    private readonly IWarehouseRepository _warehouseRepository;
 
-    public WarehouseService(IWarehouseRepository warehouseRepository, IProductRepository productRepository, IOrderRepository orderRepository)
+    public WarehouseService(IOrderRepository orderRepository, IProductRepository productRepository, IProduct_WarehouseRespository productWarehouseRespository, IWarehouseRepository warehouseRepository)
     {
-        _warehouseRepository = warehouseRepository;
-        _productRepository = productRepository;
         _orderRepository = orderRepository;
+        _productRepository = productRepository;
+        _productWarehouseRespository = productWarehouseRespository;
+        _warehouseRepository = warehouseRepository;
     }
-    
+
     public async Task<int> RegisterProductInWarehouseAsync(RegisterProductInWarehouseRequestDTO dto)
     {
         var product = await _productRepository.GetProductByIdAsync(dto.IdProduct!.Value);
@@ -29,14 +31,19 @@ public class WarehouseService : IWarehouseService
         {
             throw new NotFoundException("Product not found");
         }
-        
         var warehouse = await _warehouseRepository.GetWarehouseByIdAsync(dto.IdWarehouse!.Value);
         if (warehouse == null)
         {
             throw new NotFoundException("Warehouse not found");
         }
         
-        var order = await _orderRepository.GetOrderByIdAsync(dto.IdOrder);
+        if (dto.Amount <= 0)
+        {
+            throw new NotFoundException("Amount cannot be less than 0");
+        }
+        
+        var order = await _orderRepository.GetOrderByProductIdAndAmountAsync(dto.IdProduct!.Value, dto.Amount);
+
         if (order == null)
         {
             throw new NotFoundException("Order not found");
@@ -46,18 +53,24 @@ public class WarehouseService : IWarehouseService
         {
             throw new BadRequestException("Order's creation date is in the future");
         }
+        
+        var productWarehouse  = await _productWarehouseRespository.GetProduct_WarehouseByIdOrderAsync(order.IdOrder);
+        if (productWarehouse != null)
+        {
+            throw new BadRequestException("There already is order with this Id in table Product_Warehouse");
+        }
 
-        int idOrder = order.IdOrder;
+        _orderRepository.UpdateFullfilledAtInOrder(order.IdOrder);
 
-        var idProductWarehouse = await _warehouseRepository.RegisterProductInWarehouseAsync(
-            idWarehouse: dto.IdWarehouse!.Value,
-            idProduct: dto.IdProduct!.Value,
-            idOrder: idOrder,
-            createdAt: DateTime.UtcNow);
+        Decimal price = order.Amount * product.Price;
+        
+        var idProductWarehouse = await _productWarehouseRespository.RegisterProductInProductWarehouseAsync(
+            dto.IdWarehouse, dto.IdProduct, order.IdOrder, order.Amount, price, DateTime.UtcNow);
 
         if (!idProductWarehouse.HasValue)
             throw new Exception("Failed to register product in warehouse");
 
         return idProductWarehouse.Value;
+        
     }
 }

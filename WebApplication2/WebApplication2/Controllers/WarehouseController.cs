@@ -17,6 +17,7 @@ public class WarehouseController : ControllerBase
     
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> RegisterProductInWarehouseAsync([FromBody] RegisterProductInWarehouseRequestDTO dto)
@@ -25,6 +26,10 @@ public class WarehouseController : ControllerBase
         {
             var idProductWarehouse = await _warehouseService.RegisterProductInWarehouseAsync(dto);
             return Ok(idProductWarehouse);
+        }
+        catch (BadRequestException e)
+        {
+            return BadRequest(e.Message);
         }
         catch (NotFoundException e)
         {
