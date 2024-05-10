@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.SqlClient;
 using WebApplication2.Models;
 
@@ -7,6 +8,7 @@ public interface IProduct_WarehouseRespository
 {
     public Task<ProductWarehouse> GetProduct_WarehouseByIdOrderAsync(int orderId);
     public Task<int?> RegisterProductInProductWarehouseAsync(int? idWarehouse, int? idProduct, int? idOrder, int amount, Decimal price, DateTime createdAt);
+    public Task<int?> RegisterProductInWarehouseByProcedureAsync(int? idWarehouse, int? idProduct, int amount, DateTime createdAt);
 }
 public class Product_WarehouseRespository: IProduct_WarehouseRespository
 {
@@ -70,6 +72,36 @@ public class Product_WarehouseRespository: IProduct_WarehouseRespository
         catch
         {
             
+            await transaction.RollbackAsync();
+            throw new Exception("Error registering product in Product_Warehouse");
+        }
+    }
+    
+    public async Task<int?> RegisterProductInWarehouseByProcedureAsync(int? idWarehouse, int? idProduct, int amount, DateTime createdAt)
+    {
+        await using var connection = new SqlConnection(_configuration["ConnectionStrings:DefaultConnection"]);
+        await connection.OpenAsync();
+    
+        await using var transaction = await connection.BeginTransactionAsync();
+    
+        try
+        {
+            await using var command = new SqlCommand("AddProductToWarehouse", connection);
+            command.Transaction = (SqlTransaction)transaction;
+            command.CommandType = CommandType.StoredProcedure;
+            command.Parameters.AddWithValue("@IdWarehouse", idWarehouse);
+            command.Parameters.AddWithValue("@IdProduct", idProduct);
+            command.Parameters.AddWithValue("@Amount", amount);
+            command.Parameters.AddWithValue("@CreatedAt", DateTime.UtcNow);
+            await command.ExecuteNonQueryAsync();
+
+            // No need to call ExecuteScalarAsync here
+        
+            await transaction.CommitAsync();
+            return null; // Or return any relevant value
+        }
+        catch
+        {
             await transaction.RollbackAsync();
             throw new Exception("Error registering product in Product_Warehouse");
         }

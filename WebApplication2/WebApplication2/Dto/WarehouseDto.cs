@@ -11,5 +11,5 @@ public class RegisterProductInWarehouseRequestDTO
     [Required]
      public int Amount { get; set; } 
     [Required]
-    public DateTime? CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
